@@ -1,0 +1,21 @@
+{
+  "name": "perf-sandbox",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "install-selenium": "node ./node_modules/selenium-standalone/bin/selenium-standalone install",
+    "start-selenium": "node ./node_modules/selenium-standalone/bin/selenium-standalone start",
+    "start-server": "npm run install-selenium && npm run start-selenium",
+    "measure-fps": "node ./index.js",
+    "measure-fps-debug": "node --inspect-brk ./index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "hunterchristian-browser-perf": "^1.0.0",
+    "lodash": "^4.17.5",
+    "minimist": "^1.2.0",
+    "selenium-standalone": "^6.13.0"
+  }
+}
