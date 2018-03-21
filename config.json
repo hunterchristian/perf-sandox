@@ -1,0 +1,14 @@
+{
+  "numSamples": 8, // The number of times that every scroll speed is tested. Total page scrolls for a given speed is numSamples * numPageScrollsPerSample
+  "numPageScrollsPerSample": 5, // For a single sample, this is the number of times that we scroll the page, then pause. E.g. scroll down 25000 pixels with a speed of 6000 pixels per second, then pause, then do it again
+  "pathToChromeProfile": "/Users/hunter.hodnett/Library/Application Support/Google/Chrome/Default",
+  "scrollDistance": 25000, // measured in pixels
+  "speedsToRun": {
+    // Scroll speed units are pixels/second
+    "fast": 6000,
+    "moderate": 3000,
+    "slow": 800
+  },
+  "url": "https://alpha.reddit.com/r/popular",
+  "waitForLogin": false // Set this to true when you hit a URL for the very first time. Need to login, and then cookie will be saved for future tests
+}

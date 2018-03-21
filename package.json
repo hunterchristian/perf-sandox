@@ -13,9 +13,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "hunterchristian-browser-perf": "^1.0.0",
+    "hunterchristian-browser-perf": "^1.0.1",
     "lodash": "^4.17.5",
     "minimist": "^1.2.0",
-    "selenium-standalone": "^6.13.0"
+    "selenium-standalone": "^6.13.0",
+    "strip-json-comments": "^2.0.1"
   }
 }

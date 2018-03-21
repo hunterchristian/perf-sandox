@@ -1,37 +1,18 @@
 const browserPerf = require('hunterchristian-browser-perf');
 const times = require('lodash/times');
-const readFile = require('./helpers/readFile.js');
-const writeFile = require('./helpers/writeFile.js');
+const fs = require('fs');
+const strip = require('strip-json-comments')
 
-const options = require('minimist')(process.argv.slice(2));
-
-const getBrowsers = (browsers) => browsers && browsers.split(',');
-const BROWSERS_BEING_TESTED = getBrowsers(options.browsers) || ['chrome'];
-
-// Check required options
-if (!options.url) {
-	console.error('Please specify a URL, e.g. "npm run measure-fps -- --url=https://www.reddit.com"');
+const config = JSON.parse(strip(fs.readFileSync('./config.json', 'utf-8')));
+// Check required config values
+if (!config.url) {
+	console.error('Please specify a URL');
 	process.exit();
 }
-if (!options.username || !options.accesskey) {
-	console.error('Please specify a username and accesskey for your sauce labs account, e.g. "npm run measure-fps -- --username=yourusername --accesskey=youraccesskey"');
-	process.exit();
-}
-const URL_BEING_TESTED = options.url;
 
 // Assume that a selenium server is being run locally via "npm run start-server"
 const DEFAULT_SELENIUM_SERVER_URL = 'http://localhost:4444/wd/hub';
-const ELEMENT_WAIT_TIMEOUT_MILLIS = 500;
-const POLLING_INTERVAL_MILLIS = 300;
-// Scroll speed units are pixels/second
-const FAST_SCROLL_SPEED = 6000;
-const MODERATE_SCROLL_SPEED = 3000;
-const SLOW_SCROLL_SPEED = 800;
-// The number of times that we scroll the page, then pause
-const NUM_PAGE_SCROLLS = 5;
-// Scroll distance is actually defined in chrome_scroll.js
-//const SCROLL_DISTANCE = 25000;
-const NUM_SAMPLES = 8;
+
 
 const average = data => {
   var sum = data.reduce(function(sum, value){
@@ -66,8 +47,32 @@ const getElementByCss = (browser, selector) =>
 	);
 
 const runPerfTest = scrollSpeed => new Promise(async (resolve, reject) => {
-	const firefoxProfile = await readFile('./data/firefoxprofile');
-	browserPerf(URL_BEING_TESTED, function(err, res) {
+	const options = {
+		selenium: DEFAULT_SELENIUM_SERVER_URL,
+		browsers: [
+			{
+				browserName: 'chrome',
+				chromeOptions: {
+					args: [`--user-data-dir=${ config.pathToChromeProfile }`],
+				}
+			}
+		],
+		actions: [
+			...times(config.numPageScrollsPerSample, () => browserPerf.actions.scroll({
+				speed: scrollSpeed,
+				distance: config.scrollDistance
+			})),
+		]
+	};
+
+	if (config.waitForLogin) {
+		options.preScript = async browser => {
+			await browser.get(config.url);
+			await browser.sleep(60000);
+		};
+	}
+
+	browserPerf(config.url, function(err, res) {
 		// res - array of objects. Metrics for this URL
 		if (err) {
 			console.log('ERROR: ' + err);
@@ -75,74 +80,27 @@ const runPerfTest = scrollSpeed => new Promise(async (resolve, reject) => {
 		} else {
 			resolve(res[0].framesPerSec_raf);
 		}
-	}, {
-		selenium: DEFAULT_SELENIUM_SERVER_URL,  //'ondemand.saucelabs.com',
-		// username: options.username,
-		// accesskey: options.accesskey,
-		browsers: [
-			{
-				browserName: 'chrome',
-				chromeOptions: {
-					args: ['--user-data-dir=/Users/hunter.hodnett/Library/Application Support/Google/Chrome/Default'],
-				}
-			}
-		],
-		// preScript: async browser => {
-		// 	// try {
-		// 	// 	await browser.get(URL_BEING_TESTED);
-		// 	// 	const loginLink = await getElementByCss(browser, 'a.desktop-onboarding-sign-up__form-toggler');
-		// 	// 	if (loginLink) {
-		// 	// 		// TODO: detect when we have successfully logged into Okta rather
-		// 	// 		// than sleeping for 90 seconds
-		// 	// 		console.log('login detected');
-		// 	// 		await loginLink.click();
-		// 	// 		const username = await getElementByCss(browser, '#user_login');
-		// 	// 		await username.type(options.username);
-
-		// 	// 		const password = await getElementByCss(browser, '#passwd_login');
-		// 	// 		await password.type(options.password);
-
-		// 	// 		// Calling el.click() throws an error saying that the element is no longer in the page...
-		// 	// 		await browser.eval(`$('button[type="submit"]').click()`);
-		// 	// 	}
-		// 	// } catch (err) {
-		// 	// 	console.error(err);
-		// 	// }
-		// 	await browser.get(URL_BEING_TESTED);
-		// 	await browser.sleep(35000);
-		// },
-		actions: [
-			...times(NUM_PAGE_SCROLLS, () => browserPerf.actions.scroll({ speed: scrollSpeed })),
-		]
-	});
+	}, options);
 });
 
-const samples = {
-	fastScrollFps: [],
-	moderateScrollFps: [],
-	slowScrollFps: [],
-};
+const results = {};
 const collectPerfData = async () => {
-	let fastScrollFps = await runPerfTest(FAST_SCROLL_SPEED);
-	samples.fastScrollFps.push(fastScrollFps);
-	console.log(`average for fast scroll: ${ average(samples.fastScrollFps) } fps`);
-	console.log(`standard deviation for fast scroll: ${ getStandardDeviation(samples.fastScrollFps) } fps`);
+	for (let speed in config.speedsToRun) {
+		console.log(`Testing scroll speed: ${ speed }`);
 
-	let moderateScrollFps = await runPerfTest(MODERATE_SCROLL_SPEED);
-	samples.moderateScrollFps.push(moderateScrollFps);
-	console.log(`average for moderate scroll: ${ average(samples.moderateScrollFps) } fps`);
-	console.log(`standard deviation for moderate scroll: ${ getStandardDeviation(samples.moderateScrollFps) } fps`);
+		results[speed] = results[speed] || [];
+		let scrollFps = await runPerfTest(config.speedsToRun[speed]);
+		results[speed].push(scrollFps);
 
-	let slowScrollFps = await runPerfTest(SLOW_SCROLL_SPEED);
-	samples.slowScrollFps.push(slowScrollFps);
-	console.log(`average for slow scroll: ${ average(samples.slowScrollFps) } fps`);
-	console.log(`standard deviation for slow scroll: ${ getStandardDeviation(samples.slowScrollFps) } fps\n`);
+		console.log(`-- ${ speed } scroll, average = ${ average(results[speed]) } fps`);
+		console.log(`-- ${ speed } scroll, standard deviation = ${ getStandardDeviation(results[speed]) } fps\n`);
+	}
 }
 
 const main = async () => {
-	console.log(`TEST STARTING WITH PARAMETERS - NUM_SAMPLES: ${ NUM_SAMPLES }, NUM_PAGE_SCROLLS: ${ NUM_PAGE_SCROLLS }`);
-	for (let i = 0; i < NUM_SAMPLES; i++) {
-		console.log(`=== SAMPLE NUMBER: ${ i + 1 } ===`);
+	console.log(`\nTEST STARTING WITH PARAMETERS - numSamples: ${ config.numSamples }, numPageScrollsPerSample: ${ config.numPageScrollsPerSample }, scrollDistance: ${ config.scrollDistance }`);
+	for (let i = 0; i < config.numSamples; i++) {
+		console.log(`\n=== SAMPLE NUMBER: ${ i + 1 } ===`);
 		await collectPerfData();
 	}
 }
