@@ -13,8 +13,8 @@ if (!options.url) {
 	console.error('Please specify a URL, e.g. "npm run measure-fps -- --url=https://www.reddit.com"');
 	process.exit();
 }
-if (!options.username || !options.password) {
-	console.error('Please specify a username and password for your reddit account, e.g. "npm run measure-fps -- --username=yourusername --password=yourpassword"');
+if (!options.username || !options.accesskey) {
+	console.error('Please specify a username and accesskey for your sauce labs account, e.g. "npm run measure-fps -- --username=yourusername --accesskey=youraccesskey"');
 	process.exit();
 }
 const URL_BEING_TESTED = options.url;
@@ -28,7 +28,7 @@ const FAST_SCROLL_SPEED = 6000;
 const MODERATE_SCROLL_SPEED = 3000;
 const SLOW_SCROLL_SPEED = 800;
 // The number of times that we scroll the page, then pause
-const NUM_PAGE_SCROLLS = 1;
+const NUM_PAGE_SCROLLS = 5;
 // Scroll distance is actually defined in chrome_scroll.js
 //const SCROLL_DISTANCE = 25000;
 const NUM_SAMPLES = 8;
@@ -76,7 +76,9 @@ const runPerfTest = scrollSpeed => new Promise(async (resolve, reject) => {
 			resolve(res[0].framesPerSec_raf);
 		}
 	}, {
-		selenium: DEFAULT_SELENIUM_SERVER_URL,
+		selenium: DEFAULT_SELENIUM_SERVER_URL,  //'ondemand.saucelabs.com',
+		// username: options.username,
+		// accesskey: options.accesskey,
 		browsers: [
 			{
 				browserName: 'chrome',
@@ -122,19 +124,16 @@ const samples = {
 };
 const collectPerfData = async () => {
 	let fastScrollFps = await runPerfTest(FAST_SCROLL_SPEED);
-	console.log(`fast scroll FPS: ${ fastScrollFps }`);
 	samples.fastScrollFps.push(fastScrollFps);
 	console.log(`average for fast scroll: ${ average(samples.fastScrollFps) } fps`);
 	console.log(`standard deviation for fast scroll: ${ getStandardDeviation(samples.fastScrollFps) } fps`);
 
 	let moderateScrollFps = await runPerfTest(MODERATE_SCROLL_SPEED);
-	console.log(`moderate scroll FPS: ${ moderateScrollFps }`);
 	samples.moderateScrollFps.push(moderateScrollFps);
 	console.log(`average for moderate scroll: ${ average(samples.moderateScrollFps) } fps`);
 	console.log(`standard deviation for moderate scroll: ${ getStandardDeviation(samples.moderateScrollFps) } fps`);
 
 	let slowScrollFps = await runPerfTest(SLOW_SCROLL_SPEED);
-	console.log(`slow scroll FPS: ${ slowScrollFps }`);
 	samples.slowScrollFps.push(slowScrollFps);
 	console.log(`average for slow scroll: ${ average(samples.slowScrollFps) } fps`);
 	console.log(`standard deviation for slow scroll: ${ getStandardDeviation(samples.slowScrollFps) } fps\n`);
@@ -143,6 +142,7 @@ const collectPerfData = async () => {
 const main = async () => {
 	console.log(`TEST STARTING WITH PARAMETERS - NUM_SAMPLES: ${ NUM_SAMPLES }, NUM_PAGE_SCROLLS: ${ NUM_PAGE_SCROLLS }`);
 	for (let i = 0; i < NUM_SAMPLES; i++) {
+		console.log(`=== SAMPLE NUMBER: ${ i + 1 } ===`);
 		await collectPerfData();
 	}
 }
